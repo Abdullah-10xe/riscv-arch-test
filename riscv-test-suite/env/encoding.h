@@ -183,6 +183,49 @@
 #define PMP6_CFG_SHIFT  48
 #define PMP7_CFG_SHIFT  56
 
+/*  SMEPMP*/
+
+#define PMP_ADDR_SHIFT         2
+#define RLB_SET                0x4
+#define MML_SET                0x1
+#define MMWP_SET               0x2
+
+// PMP permission encodings form MML table
+
+#define NONE    0x0  
+#define X       0x1  
+#define W       0x2  
+#define WX      0x3  
+#define R       0x4  
+#define RX      0x5  
+#define RW      0x6   
+#define RWX     0x7  
+#define L       0x8  
+#define LX      0x9  
+#define LW      0xA  
+#define LWX     0xB  
+#define LR      0xC  
+#define LRX     0xD  
+#define LRW     0xE  
+#define LRWX    0xF   
+
+// PMP matching modes
+
+#define TOR            0x1
+#define OFF            0x0
+#define SMEPMP_NAPOT   0x2
+// PMP configuration macro for packing fields
+#define PMPCFG(MATCH_MODE,LRWX)               \
+ (((0x00)|(MATCH_MODE <<3)) |                 \
+ ((LRWX & 0x08)<< 4)        |                 \
+ ((LRWX & 0x04)>>2)         |                 \
+ (LRWX & 0x02)              |                 \
+ ((LRWX & 0x01)<<2))                          
+
+/* PMPICFG Clear and Set encoding  */
+#define CLEAR(X)               (0xFF << (X) )
+#define SET(LAXWR_m,Y)         (LAXWR_m << (Y) )
+
 #define IRQ_S_SOFT   1
 #define IRQ_H_SOFT   2
 #define IRQ_M_SOFT   3
