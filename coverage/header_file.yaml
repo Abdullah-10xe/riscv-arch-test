@@ -902,7 +902,7 @@ common:
  MIP_HEIP: (1 << IRQ_H_EXT)
  MIP_MEIP: (1 << IRQ_M_EXT)
  RISCV_PGSIZE: (1 << RISCV_PGSHIFT)
-
+ SMEPMP_TOR: ( (((rs1_val + imm_val)>>2 ) >= pmpaddr0) and   ( (((rs1_val + imm_val)>>2 ) <= pmpaddr1)  )   )
 PMP_MACROS:
  PMPCFG_BIT_SET: 1
  PMPCFG_BIT_NOT_SET: 0
