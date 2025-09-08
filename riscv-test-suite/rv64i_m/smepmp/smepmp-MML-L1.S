@@ -1,13 +1,18 @@
 // ---------------------------------------------------------------------------
-// Copyright (c) 2025. RISC-V International. All rights reserved.
+// Copyright (c) 2020. RISC-V International. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause
-// Title       	 : Comprehensive ACTS For SMEPMP (Supervisor Mode Enchanced Physical Memory Protection) Verification
-// Authors     	 : Abdullah Jhatial
-// Contact	  	 : https://github.com/Abdullah-10xe
-// Test Plan     : https://docs.google.com/spreadsheets/d/10nzG7CR1VP7XvQDaEkK3NrWb0W8dXFUt0H6VPZ99yVY/edit?gid=0#gid=0
-//-----------------------------------------------------------------------------------------------------------------------------------------------
-// Description   : This test verifies the functionality  of SMEPMP 
-//                 when MML bit and Lock bit is set 
+// Title       	: Comprehensive ACTS For SMEPMP (Supervisor Mode Enchanced Physical Memory Protection) Verification
+// Authors     	: Abdullah Jhatial
+// Contact	  	: https://github.com/Abdullah-10xe
+// Test Plan    : https://docs.google.com/spreadsheets/d/10nzG7CR1VP7XvQDaEkK3NrWb0W8dXFUt0H6VPZ99yVY/edit?gid=0#gid=0
+//-----------------------------------------------------------------------------------------------------------------------
+// Description  : This test verifies the functionality  of SMEPMP 
+//                when MML bit and Lock bit is set 
+//
+// Note         : For Verifing each case we setup the region permissions at start of the Test as Follow
+//              : Locked Shared Code Region (LRWX=1011 )for test.init(code) region , and Sared Data region for other region
+//              : Set Region under test region at highest Priority 
+//-----------------------------------------------------------------------------------------------------------------------
 //
 // Note          : For Verifing each CASE we setup the region permissions at start of the Test as follow
 //
@@ -18,37 +23,32 @@
 //
 // Step 3        : Set MML (Machine Mode Lockdown) in mseccfg
 //
-// Step 4        : Configure region for Code Section form rvtest_entry_point to end_code_section as LWX
+// Step 4        : Configure region from rvtest_entry_point to end_code_section as LWX  
 //
 // Step 5        : Configure  region for Shared Data Section form end_code_section to rvmodel_data_end as WX
 //
-// Step 6: Configure  region for Region Under Test region_under_test to region_under_test_end  at Highest pripority 
-//        - Permissions will be applied dynamically during test case .
+// Step 6        : Configure  region for Region Under Test region_under_test to region_under_test_end  at Highest pripority 
+//                 - Permissions will be applied dynamically during test case .
 //
-//------------------------------------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------------------------------------
 //
-// Test Cases   : Case 0 verify the sticknes of MML bit
-//                Case 1 to Case 8 verifes, each configuration LRWX with MML Set and Lock Bit Set
-//                Each CASE Verify READ/WRITE/EXECUTE in SMEPMP Pemission Enforced region
-//                With BYTE/HALF_BYTE/WORD granulity
+// case1        : Set Permission   For Region Under Test As LRWX = 1000
+// case2        : Set Permission   For Region Under Test As LRWX = 1001 
+// case3        : Set Permission   For Region Under Test As LRWX = 1010
+// case4        : Set Permission   For Region Under Test As LRWX = 1011
+// case5        : Set Permission   For Region Under Test As LRWX = 1100
+// case6        : Set Permission   For Region Under Test As LRWX = 1101
+// case7        : Set Permission   For Region Under Test As LRWX = 1110
+// case8        : Set Permission   For Region Under Test As LRWX = 1111
 //
-// Case 0       : MML bit is set in initial permission Setup code  now Unset the MML bit and update the signature  
-// Case 1       : Set Permission   For Region Under Test As LRWX = 0000 (Inaccessible region)
-// Case 2       : Set Permission   For Region Under Test As LRWX = 0001 (Execute-only region)
-// Case 3       : Set Permission   For Region Under Test As LRWX = 0010 (Shared data region: Read/write on M mode, read-only on S/U mode)
-// Case 4       : Set Permission   For Region Under Test As LRWX = 0011 (Shared data region: Read/write for both M and S/U mode  )
-// Case 5       : Set Permission   For Region Under Test As LRWX = 0100 (Read-only region)
-// Case 6       : Set Permission   For Region Under Test As LRWX = 0101 (Read/Execute region)
-// Case 7       : Set Permission   For Region Under Test As LRWX = 0110 (Read/Write region)
-// Case 8       : Set Permission   For Region Under Test As LRWX = 0111 (Read/Write/Execute region only in SU)
-//
-//------------------------------------------------------------------------------------------------------------------------------------------------
-// Verifiction  : For each CASE: Execute,Store,Load from region under test at Byte/Half byte/Word granulity in differnt modes 
-// Note         : Verifecation in S Mode and U Mode can be Controlled by SMODE ,UMODE Macros in this test file 
-//------------------------------------------------------------------------------------------------------------------------------------------------
-// Expected Behavior   : In Each CASE expected Access Fault occur in Each Mode, LRWX permissions are enforced as Spec manifest 
-// Dependencies        : model_test.h, arch_test.h
-// -----------------------------------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------
+// Verifiction  : For each case Execute,Store,Load from region under test at Byte/Half byte/Word granulity in differnt modes 
+// Note         : Verifecation in S Mode and U Mode can be Controlled by SMODE ,UMODE Macro in this test file 
+//-----------------------------------------------------------------------------------------------------------------------
+// Expected     : In Each Case expected Access Fault occur in Each Mode, RWX permissions are enforced as Spec manifest 
+// Dependencies : model_test.h, arch_test.h
+//Fault         : INSTRUCTION ACCESS FAULT ,LOAD_ASSECC_FAULT,STORE_ACCESS_FAULT
+// ---------------------------------------------------------------------------
 
 #include "model_test.h"
 #include "arch_test.h"
@@ -66,11 +66,11 @@ RVTEST_ISA("RV32I_Zicsr")
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",load_byte_hit)
+RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True ",SMEPMP_MML_LRWX)
 
 // ---------------------------------------------------------------------------
 // PMP Configuration Constants
-// ------------------- --------------------------------------------------------
+// ---------------------------------------------------------------------------
 #ifndef RVMODEL_PMP_GRAIN
   #define RVMODEL_PMP_GRAIN 0
 #endif
@@ -82,18 +82,21 @@ RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",load_byte_hit)
 #ifdef TEST
 #define SMODE    True
 #define UMODE    True																
+
 // ---------------------------------------------------------------------------
-// INSTRUCTION ENCODING
+// INSTRUCTION ENCODDINGS
 // ---------------------------------------------------------------------------
 #define INSTRUCTION            0x00150513
+
 // ---------------------------------------------------------------------------
-// Signature Space for Recording Signatures
+// Signature Space for Recording Signatures 
 // ---------------------------------------------------------------------------
 RVTEST_SIGBASE(x13, begin_signature1)
 .attribute unaligned_access,0
 .attribute stack_align ,16
 .option  norvc
 .align	3
+csrw satp, x0	
 // ---------------------------------------------------------------------------
 // Macro: PMPCFG_SET
 // Description : Updates PMP configuration registers.
@@ -105,7 +108,7 @@ RVTEST_SIGBASE(x13, begin_signature1)
 // ---------------------------------------------------------------------------
 .macro PMPCFG_SET PMPCFGI  PMPICFG  LAXWR  PMPCFGI_SET  
  .if \PMPCFGI_SET == False
-   LI ( a5, CLEAR(\PMPICFG))     // CLEAR selected PMP entry
+   LI(a5, CLEAR(\PMPICFG))     // CLEAR selected PMP entry
    csrc \PMPCFGI,a5              // Apply CLEAR
    LI( a5, SET(\LAXWR,\PMPICFG)) // Load new permissions
    csrs \PMPCFGI ,a5             // Apply permissions
@@ -121,6 +124,7 @@ RVTEST_SIGBASE(x13, begin_signature1)
 // Description : Writes a physical address into PMPADDRi for TOR matching.
 // Notes       : Address is shifted right by 2 (word aligned).
 // ---------------------------------------------------------------------------
+
 .macro TOR_PMPADDR  pmpaddri ADDRESS  
  LA( a4,  \ADDRESS )           
  srli a4,a4,PMP_ADDR_SHIFT    
@@ -136,6 +140,7 @@ RVTEST_SIGBASE(x13, begin_signature1)
 //   3. Attempts load operations (lb/lh/lw).
 //   4. Updates the test signature with the results.
 // ---------------------------------------------------------------------------
+
 .macro RWX_Access  REGION_UNDER_TEST
  nop
  nop
@@ -181,7 +186,8 @@ RVTEST_SIGBASE(x13, begin_signature1)
  RWX_Access \ADDRESS-4
 
  #ifdef SMODE 
- RVTEST_GOTO_LOWER_MODE Smode
+ RVTEST_GOTO_LOWER_MODE	Smode
+ csrr a4,mstatus
  RWX_Access \ADDRESS
  RVTEST_GOTO_MMODE
  #endif
@@ -215,99 +221,94 @@ Test_setup:
 //   - Defines TOR regions for code/data
 //   - Enables MML in mseccfg to restrict M-mode
 // ---------------------------------------------------------------------------
-
-initial_permission_setup:
+initial_permission_setup_start:
 
 LI( a4,RLB_SET)
 csrs mseccfg,a4
 
-// SET TOR address range with permissions
-
-TOR_PMPADDR pmpaddr4 ,  initial_permission_setup 
+// Define TOR region with initial execute-only permissions
+TOR_PMPADDR pmpaddr4 ,  initial_permission_setup_start
 TOR_PMPADDR pmpaddr5 , initial_permission_setup_end 
 PMPCFG_SET pmpcfg1 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LX),False 
 
-// SET MML bit in mseccfg            
-
+// Enable MML (restricts M-mode after setup)
 LI( a4,MML_SET)
 csrs mseccfg,a4
 
-//  SET the permssion for M/S/U Mode; Execute for M/S and read only for M mode
-
+// Define code space (LWX = locked R/W/Execute for safety)
 TOR_PMPADDR  pmpaddr2 , rvtest_entry_point
 TOR_PMPADDR  pmpaddr3 , end_code_section
 PMPCFG_SET pmpcfg0 ,PMP3_CFG_SHIFT,PMPCFG(TOR,LWX) ,False
 
-// SET Shared Data region RW for both modes
-
+// Shared data region = RW for all modes
 TOR_PMPADDR pmpaddr4,end_code_section
 TOR_PMPADDR pmpaddr5 ,rvmodel_data_end
-PMPCFG_SET pmpcfg1 ,PMP1_CFG_SHIFT,PMPCFG(TOR,WX),False
+PMPCFG_SET pmpcfg1 ,PMP1_CFG_SHIFT,   PMPCFG(TOR,WX),False
 
-// SET address register for region  under test
-
-TOR_PMPADDR pmpaddr0 , region_under_test
+// Test region (RWX verification target)
+TOR_PMPADDR pmpaddr0 , region_under_test_start
 TOR_PMPADDR pmpaddr1 , region_under_test_end
 
 initial_permission_setup_end:
+
 test_code:
-//CASE zero
+
+// case 0  SET permission for region under test 
 LI( a4,0x1 )
 csrc mseccfg,a4
 RVTEST_SIGUPD(x13,a4)
 
-// CASE 1 Inaccessible region SET the permsission
+// case 1 Inaccessible region s
 
-
-PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,NONE),False
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,L),False
 RWX_VERIF region_under_test_end
 
-//CASE 2    Execute-only region
+//Case 2   Locked Execute-only region
  
-PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,X) ,False
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LX) ,False
 RWX_VERIF region_under_test_end
 
-// Case3  Shared data region: Read/write on M mode, read-only on S/U mode
+// Case3 Locked Shared code region: Execute only on both M and S/Umode.*
 
-PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,W)  ,False
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LW)  ,False
 RWX_VERIF region_under_test_end
 
 
-// CASE 4 Shared data region: Read/write for both M and S/U mode 
+// case4 Locked Shared code region: Execute only on S/U mode,read/execute on M mode.*
 
-PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,WX) ,False
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LWX) ,False
 RWX_VERIF region_under_test_end
 
-// CASE 5  Read-only region in S/U mode only
+// Case 5 Locked Read-only region*
 
-PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT, PMPCFG(TOR,R)  ,False
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT, PMPCFG(TOR,LR)  ,False
 RWX_VERIF region_under_test_end
 
-//CASE 6  Read/Execute region in S/U mode only
+//Case 6 Locked Read/Execute region
 
-PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,RX) ,False
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LRX) ,False
 RWX_VERIF region_under_test_end
 
-//CASE 7   Read/Write region in S/U mode only
+//Case 7  Locked Read/Write region
 
-PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,RW) ,False
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LRW) ,False
 RWX_VERIF region_under_test_end
 
- //  Read Write Execute in S/U mode only
+ // Locked Shared data region: Read only on both M and S/U mode.*
 
-PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,RWX)  ,False
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LRWX)  ,False
 RWX_VERIF region_under_test_end
+
 
 nop
 nop 
 j exit
 nop
 nop
-
-.align 4
+.align RVMODEL_PMP_GRAIN
 // Region Under 
 
-region_under_test:
+region_under_test_start:
 .rept (1 << RVMODEL_PMP_GRAIN )
 addi a6,a6,1
 .endr
@@ -321,7 +322,6 @@ return_to_verif:
  jr ra
  nop
  nop
-
 // label for facilitating test control flow
 
 exit:

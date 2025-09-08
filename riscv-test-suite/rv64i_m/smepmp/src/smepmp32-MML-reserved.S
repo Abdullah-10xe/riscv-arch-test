@@ -6,26 +6,26 @@
 // Contact	  	: https://github.com/Abdullah-10xe
 // Test Plan    : https://docs.google.com/spreadsheets/d/10nzG7CR1VP7XvQDaEkK3NrWb0W8dXFUt0H6VPZ99yVY/edit?gid=0#gid=0
 //-----------------------------------------------------------------------------------------------------------------------
-// Description  : This test verifies the Reserved Encoding is WARL when MML is 0
-// Test Cases   : Case 1 SET WRITE only in PMPICFG 
-//              : Case 2 SET WRITE EXECUTE 
-//              : Case 3 SET Locked WRITE
-//              : Case 4 SET Locked WRITE EXECUTE 
-// Dependencies : model_test.h, arch_test.h
+// Description  : This test verifies the Reserved Encoding not be written when MML is 0 
+// Test         :   SET WRITE only   PMPICFG  
+//              :   SET WRITE EXECUTE          
+//              :   SET Locked WRITE           
+//              :   SET Locked WRITE EXECUTE 
+// Dependencies :   model_test.h, arch_test.h
 // Fault        : No fault expected from test code 
 // ---------------------------------------------------------------------------
 
 #include "model_test.h"
 #include "arch_test.h"
 
-RVTEST_ISA("RV32I_Zicsr")
+RVTEST_ISA("RV64I_Zicsr")
 
 .section .text.init
 .globl rvtest_entry_point
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",load_byte_hit)
+RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine = True;", MML_Reserved_Encoding)
 
 #ifndef RVMODEL_PMP_GRAIN
   #define RVMODEL_PMP_GRAIN 0
@@ -80,7 +80,7 @@ Test_setup:
   .SET pmpcfgi , CSR_PMPCFG0
   .rept RVMODEL_NUM_PMPS/4
      csrw pmpcfgi ,x0        // CLEAR PMP configuration register
-  .SET pmpcfgi ,pmpcfgi+1
+  .SET pmpcfgi ,pmpcfgi+2
   .endr
   .SET pmpaddri ,CSR_PMPADDR0
   .rept RVMODEL_NUM_PMPS
@@ -93,12 +93,24 @@ Test_setup:
    Test Code: Configure PMP entries with Reserved Encoding 
    -------------------------------------------------------------------------- */
 test_code:
- // Case 1 - Case 4
+ // Test : reserved encoding
+ 
  PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,W),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
+ 
  PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,WX),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
+ 
  PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,LW),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
+ 
  PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT ,PMPCFG(TOR,LWX),False
- PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,LWX),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
+ 
 
 nop
 nop 
@@ -106,8 +118,16 @@ j exit
 nop
 nop
 .align 4
-region_under_test:
-addi a6,a6,1
+region_under_test_start:
+#ifdef RVMODEL_PMP_GRAIN == 0
+   addi a6,a6,1
+   addi a6,a6,1
+#endif
+#ifdef RVMODEL_PMP_GRAIN > 0
+.rept (1 << RVMODEL_PMP_GRAIN )
+ addi a6,a6,1
+.endr
+#endif
 region_under_test_end:
 return_to_verif:
  nop

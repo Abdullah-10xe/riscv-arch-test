@@ -23,7 +23,7 @@
 //
 // Step 3        : Set MML (Machine Mode Lockdown) in mseccfg
 //
-// Step 4        : Configure region for Code Section form rvtest_entry_point to end_code_section as LWX
+// Step 4        : Configure region from rvtest_entry_point to end_code_section as LWX  
 //
 // Step 5        : Configure  region for Shared Data Section form end_code_section to rvmodel_data_end as WX
 //
@@ -32,8 +32,8 @@
 //
 //---------------------------------------------------------------------------------------------------------------------------------------------------
 //
-// case1        : Set Permission   For Region Under Test As LRWX = 1000 (Inaccessible region)
-// case2        : Set Permission   For Region Under Test As LRWX = 1001 ()
+// case1        : Set Permission   For Region Under Test As LRWX = 1000
+// case2        : Set Permission   For Region Under Test As LRWX = 1001 
 // case3        : Set Permission   For Region Under Test As LRWX = 1010
 // case4        : Set Permission   For Region Under Test As LRWX = 1011
 // case5        : Set Permission   For Region Under Test As LRWX = 1100
@@ -66,7 +66,7 @@ RVTEST_ISA("RV32I_Zicsr")
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",SMEPMP_MML_LRWX)
+RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True ",SMEPMP_MML_LRWX)
 
 // ---------------------------------------------------------------------------
 // PMP Configuration Constants
@@ -96,7 +96,7 @@ RVTEST_SIGBASE(x13, begin_signature1)
 .attribute stack_align ,16
 .option  norvc
 .align	3
-
+csrw satp, x0	
 // ---------------------------------------------------------------------------
 // Macro: PMPCFG_SET
 // Description : Updates PMP configuration registers.
@@ -186,7 +186,8 @@ RVTEST_SIGBASE(x13, begin_signature1)
  RWX_Access \ADDRESS-4
 
  #ifdef SMODE 
- RVTEST_GOTO_LOWER_MODE Smode
+ RVTEST_GOTO_LOWER_MODE	Smode
+ csrr a4,mstatus
  RWX_Access \ADDRESS
  RVTEST_GOTO_MMODE
  #endif
@@ -220,13 +221,13 @@ Test_setup:
 //   - Defines TOR regions for code/data
 //   - Enables MML in mseccfg to restrict M-mode
 // ---------------------------------------------------------------------------
-initial_permission_setup:
+initial_permission_setup_start:
 
 LI( a4,RLB_SET)
 csrs mseccfg,a4
 
 // Define TOR region with initial execute-only permissions
-TOR_PMPADDR pmpaddr4 ,  initial_permission_setup 
+TOR_PMPADDR pmpaddr4 ,  initial_permission_setup_start
 TOR_PMPADDR pmpaddr5 , initial_permission_setup_end 
 PMPCFG_SET pmpcfg1 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LX),False 
 
@@ -245,7 +246,7 @@ TOR_PMPADDR pmpaddr5 ,rvmodel_data_end
 PMPCFG_SET pmpcfg1 ,PMP1_CFG_SHIFT,   PMPCFG(TOR,WX),False
 
 // Test region (RWX verification target)
-TOR_PMPADDR pmpaddr0 , region_under_test
+TOR_PMPADDR pmpaddr0 , region_under_test_start
 TOR_PMPADDR pmpaddr1 , region_under_test_end
 
 initial_permission_setup_end:
@@ -304,10 +305,10 @@ nop
 j exit
 nop
 nop
-.align 4
+.align RVMODEL_PMP_GRAIN
 // Region Under 
 
-region_under_test:
+region_under_test_start:
 .rept (1 << RVMODEL_PMP_GRAIN )
 addi a6,a6,1
 .endr

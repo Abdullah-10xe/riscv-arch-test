@@ -55,7 +55,7 @@ RVTEST_ISA("RV32I_Zicsr")
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",load_byte_hit)
+RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True;", MMWP )
 
 #ifndef RVMODEL_PMP_GRAIN
   #define RVMODEL_PMP_GRAIN 0
@@ -66,9 +66,11 @@ RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",load_byte_hit)
 #endif
 
 #ifdef TEST
-#ifdef rvtest_strap_routine
+
 	csrw satp, x0																	
-#endif
+
+#define UMODE  True
+#define SMODE  True
 
 #define INSTRUCTION            0x00150513
 #define ADDRESS_SPACE          -1
@@ -151,15 +153,23 @@ RVTEST_SIGBASE(x13, begin_signature1)
  RWX_Access \ADDRESS-4
 
  #ifdef SMODE 
- RVTEST_GOTO_LOWER_MODE Smode
- RWX_Access \ADDRESS
+ nop
+ nop
+ RVTEST_GOTO_LOWER_MODE   Smode
+ RWX_Access \ADDRESS-4
  RVTEST_GOTO_MMODE
+ nop
+ nop
  #endif
 
  #ifdef UMODE 
+ nop
+ nop
  RVTEST_GOTO_LOWER_MODE Umode
- RWX_Access \ADDRESS
+ RWX_Access \ADDRESS-4
  RVTEST_GOTO_MMODE
+ nop
+ nop
  #endif
 .endm
 
@@ -179,19 +189,19 @@ Test_SETup:
 
 
 
-initial_permission_setup:
+initial_permission_setup_start:
 
 /* Seeting teo regions with RWX permissions , but region under test  is not included */
 
 TOR_PMPADDR rvtest_entry_point,pmpaddr0
-TOR_PMPADDR region_under_test ,pmpaddr1
+TOR_PMPADDR region_under_test_start ,pmpaddr1
 TOR_PMPADDR region_under_test_end,pmpaddr2
 TOR_PMPADDR ADDRESS_SPACE ,  pmpaddr3
 PMPCFG_SET pmpcfg0 ,0,SET_PMPCFGi( PMPCFG(TOR,RWX) ,PMPCFG(OFF,NONE) ,PMPCFG(TOR,RWX),PMPCFG(OFF,NONE)) ,True
 
 nop
 nop
-initial_permission_Setup_end:
+initial_permission_setup_end:
 
 TEST_CODE:
 
@@ -214,13 +224,13 @@ nop
 
 LI (a4,MMWP_SET)
 csrw mseccfg,a4
-RWX_VERIF region_under_test
+RWX_VERIF region_under_test_end
 nop
 nop
 // upadte the pmpaddr1 so it include test region
 
 TOR_PMPADDR region_under_test_end ,pmpaddr1
-RWX_VERIF region_under_test_end-4
+RWX_VERIF region_under_test_end
 nop
 nop
 
@@ -231,11 +241,11 @@ j exit
 nop
 nop
 
-test_code_end:
+test_code_end_start:
 
 // Region under test region
-
-region_under_test:
+.align 4
+region_under_test_start:
 .rept (1 << RVMODEL_PMP_GRAIN )
 addi a6,a6,1
 .endr
@@ -263,14 +273,18 @@ RVMODEL_DATA_BEGIN
     .globl begin_signature
     .align 4
 begin_signature1:
-    .fill 128*(XLEN/32),(XLEN/4),0xdeadbeef
+    .rept  256
+      .word 0xdeadbeef
+    .endr
     .globl end_signature
 end_signature1:
 #ifdef rvtest_mtrap_routine
 tsig_begin_canary:
 CANARY;
 mtrap_sigptr:
-    .fill 128*(XLEN/32),4,0xdeadbeef
+  .rept  256
+      .word 0xdeadbeef
+    .endr
 tsig_end_canary:
 CANARY;
 #endif

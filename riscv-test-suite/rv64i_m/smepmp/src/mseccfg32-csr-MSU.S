@@ -6,8 +6,7 @@
 //
 // Description  : 
 //   This test verifies access behavior of the MSECCFG CSR across different 
-//   privilege modes (M/S/U). It also validates PMP setup, lock behavior, and 
-//   MML (Machine Mode Lockdown) enablement.
+//   privilege modes (M/S/U). It also validates read write of MML ,MMWP,RLB M mode only
 //
 //    Methodology:
 //     1. Clear all PMP configuration and address registers.
@@ -27,7 +26,7 @@
 #include "model_test.h"
 #include "arch_test.h"
 
-RVTEST_ISA("RV32I_Zicsr")
+RVTEST_ISA("RV64I_Zicsr")
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -38,7 +37,7 @@ RVTEST_ISA("RV32I_Zicsr")
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",load_byte_hit)
+RVTEST_CASE(1,"def TEST=True;def rvtest_strap_routine = True ;def rvtest_mtrap_routine = True;",MSECCFG_M )
 
 // ---------------------------------------------------------------------------
 // PMP configuration constants
@@ -54,8 +53,8 @@ RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",load_byte_hit)
 #ifdef TEST
 #define SET_RLB_MMWP_MML   0x7
 #define TOP_ADDRESS        -1
-#define UMODE
-#define SMODE 
+#define UMODE    1
+#define SMODE    1
 // ---------------------------------------------------------------------------
 // Signature region for test results
 // ---------------------------------------------------------------------------
@@ -108,7 +107,7 @@ nop
 // --- Supervisor mode ---
 SU_mode_case:
 #ifdef  SMODE
-RVTEST_GOTO_LOWER_MODE smode
+RVTEST_GOTO_LOWER_MODE Smode
 LI(a4 ,SET_RLB_MMWP_MML)
 csrw mseccfg ,a4
 nop
@@ -117,11 +116,14 @@ csrr a4,mseccfg
 nop
 nop
 RVTEST_SIGUPD(x13, a4) 
+nop
+nop
+RVTEST_GOTO_MMODE
 #endif
 // --- User mode ---
 #ifdef UMODE
 U_MODE :
-RVTEST_GOTO_LOWER_MODE umode
+RVTEST_GOTO_LOWER_MODE Umode
 
 nop
 nop

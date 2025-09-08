@@ -48,7 +48,7 @@
 #include "model_test.h"
 #include "arch_test.h"
 
-RVTEST_ISA("RV32I_Zicsr")
+RVTEST_ISA("RV64I_Zicsr")
 
 .section .text.init
 .globl rvtest_entry_point
@@ -56,7 +56,7 @@ RVTEST_ISA("RV32I_Zicsr")
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;",load_byte_hit)
+RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True;rvtest_strap_routine;",RLB)
 
 // ---------------------------------------------------------------------------
 // PMP constants and defaults
@@ -155,7 +155,7 @@ RVTEST_SIGBASE(x13, begin_signature1)
 
   LI ( a4, PMPCFG_OFF_L )
   csrw pmpcfg0,a4
-
+ // unset the bit while L bit is set 
   LI ( a4, RLB_SET )
   csrc mseccfg,a4
   csrr a4,mseccfg
@@ -182,10 +182,10 @@ Test_setup:
     csrw pmpaddri ,x0
     .set pmpaddri,pmpaddri+1
   .endr
+//------------------------------------------------------------------------
+ // Case 1: RLB functionality check
 
-  // Case 1: RLB functionality check
-
-  RLB_TEST
+   RLB_TEST
 
   // Case 2: RLB zero-held state check
    
