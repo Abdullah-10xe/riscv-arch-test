@@ -35,10 +35,10 @@
 //------------------------------------------------------------------------------------------------------------------------------------------------
 // Verification : For each test case, execute, load, and store instructions 
 //                from the Region Under Test at byte, halfword, and word granularity.
-//                Verification in S-mode and U-mode can be enabled using SMODE/UMODE macros.
+//
 //------------------------------------------------------------------------------------------------------------------------------------------------
 // Expected Behavior   :
-//   - Case 1: MMWP bit remains sticky once set, even after subsequent writes.
+//   - Case 1: MMWP bit remains sticky once set, even after subsequent write.
 //   - Case 2:  Execute ,Store , Laod ,in region under test raises the appropriate Faults
 // Dependencies        : model_test.h, arch_test.h
 // ------------------------------------------------------------------------------------------------------------------------------------------------
@@ -82,13 +82,23 @@ RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_rou
                     (PMP0CFG_PR))
 
 
-
+// ---------------------------------------------------------------------------
+// Signature Space for Recording Signatures 
+// ---------------------------------------------------------------------------
 RVTEST_SIGBASE(x13, begin_signature1)
 .attribute unaligned_access,0
 .attribute stack_align ,16
 .option  norvc
 .align	3
-
+// ---------------------------------------------------------------------------
+// Macro: PMPCFG_SET
+// Description : Updates PMP configuration registers.
+// Parameters  :
+//   PMPCFGI     -> PMP configuration CSR (pmpcfg0, pmpcfg1, …)
+//   PMPICFG     -> PMP entry index within the CSR (0–3)
+//   LAXWR       -> Permission bits (Lock/Access/R/W/X)
+//   PMPCFGI_SET -> If True, overwrite the entire register; otherwise update only one entry
+// ---------------------------------------------------------------------------
 .macro pmpcfg_SET pmpcfgi   pmpicfg LAXWR pmpcfgSETi
  .if \pmpcfgSETi !=1
  li a5, CLEAR(\pmpicfg)
@@ -101,12 +111,25 @@ RVTEST_SIGBASE(x13, begin_signature1)
    csrw \pmpcfgi ,a5
  .endif
 .endm
-
+// ---------------------------------------------------------------------------
+// Macro: TOR_PMPADDR
+// Description : Writes a physical address into PMPADDRi for TOR matching.
+// Notes       : Address is shifted right by 2 (word aligned).
+// ---------------------------------------------------------------------------
 .macro TOR_PMPADDR  ADDRESS  pmpaddri
  la a4,  \ADDRESS 
  srli a4,a4,PMP_ADDR_SHIFT
  csrw \pmpaddri,a4
 .endm
+// ---------------------------------------------------------------------------
+// Macro: RWX_Access
+// Description : Attempts Read/Write/Execute operations on a test region.
+// Behavior    :
+//   1. Executes a jump to the test region (verifies Execute permission).
+//   2. Attempts store operations (sb/sh/sw).
+//   3. Attempts load operations (lb/lh/lw).
+//   4. Updates the test signature with the results.
+// ---------------------------------------------------------------------------
 
 .macro RWX_Access  REGION_UNDER_TEST
  nop
@@ -142,39 +165,13 @@ RVTEST_SIGBASE(x13, begin_signature1)
  nop
 .endm
 
-// ---------------------------------------------------------------------------
-// Macro: RWX_VERIF
-// Description : Repeats RWX_Access for different privilege levels.
-// Behavior    :
-//   - Always performs access in M-mode
-//   - Optionally (if defined) also performs in S-mode and U-mode
-// ---------------------------------------------------------------------------
 .macro RWX_VERIF ADDRESS
  RWX_Access \ADDRESS-4
-
- #ifdef SMODE 
- nop
- nop
- RVTEST_GOTO_LOWER_MODE   Smode
- RWX_Access \ADDRESS-4
- RVTEST_GOTO_MMODE
- nop
- nop
- #endif
-
- #ifdef UMODE 
- nop
- nop
- RVTEST_GOTO_LOWER_MODE Umode
- RWX_Access \ADDRESS-4
- RVTEST_GOTO_MMODE
- nop
- nop
- #endif
 .endm
 
-// Set all pmpaddr and pmpcfg set to zero
-
+// ---------------------------------------------------------------------------
+// Test_setup : CLEAR all PMP entries before beginning
+// ---------------------------------------------------------------------------
 Test_SETup:
   .SET pmpcfgi , CSR_PMPCFG0
   .rept RVMODEL_NUM_PMPS/4
@@ -204,8 +201,6 @@ nop
 initial_permission_setup_end:
 
 TEST_CODE:
-
-// Case 1  Stickness of MMWP write then read the MMWP bit
 
 LI(a4,MMWP_SET)
 csrw mseccfg,a4
@@ -241,7 +236,7 @@ j exit
 nop
 nop
 
-test_code_end_start:
+test_code_end:
 
 // Region under test region
 .align 4

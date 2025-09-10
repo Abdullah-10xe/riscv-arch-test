@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // Copyright (c) 2020. RISC-V International. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause
 // Title       	: Comprehensive ACTS For SMEPMP (Supervisor Mode Enchanced Physical Memory Protection) Verification
@@ -63,7 +63,7 @@
 
 #include "model_test.h"
 #include "arch_test.h"
-RVTEST_ISA("RV32I_Zicsr")
+RVTEST_ISA("RV64I_Zicsr")
 
 // ---------------------------------------------------------------------------
 // Start of Code Region
@@ -77,7 +77,7 @@ RVTEST_ISA("RV32I_Zicsr")
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True ",SMEPMP_MML_LRWX,SMEPMP_MML_RWX)
+RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True ",SMEPMP_MML_LRWX)
 
 // ---------------------------------------------------------------------------
 // PMP Configuration Constants
@@ -95,7 +95,7 @@ RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_rou
 // ---------------------------------------------------------------------------
 // INSTRUCTION ENCODDINGS
 // ---------------------------------------------------------------------------
-#define INSTRUCTION            0x00150513
+#define INSTRUCTION            0x0015051300150513
 
 // ---------------------------------------------------------------------------
 // Signature Space for Recording Signatures 
@@ -159,7 +159,7 @@ csrw satp, x0
  RVTEST_SIGUPD(x13,a6)          // Update signature after execution
  nop
  nop
- LA( a4,\REGION_UNDER_TEST)     // Load base address
+ LA( a4,\REGION_UNDER_TEST-4)     // Load base address
  LI( a5,INSTRUCTION)
  sb a5,0(a4)                    // Try store byte
  nop
@@ -170,6 +170,9 @@ csrw satp, x0
  sw a5,0(a4)                    // Try store word
  nop
  nop
+ sd a5,0(a4)                    // Try store word
+ nop
+ nop
  lb a5,0(a4)                    // Try load byte
  nop
  nop
@@ -177,6 +180,9 @@ csrw satp, x0
  nop
  nop
  lw a5,0(a4)                    // Try load word
+ nop
+ nop
+ ld a5,0(a4)                    // Try load word
  nop
  nop
  RVTEST_SIGUPD(x13,a0)          // Update signature after load
@@ -192,7 +198,17 @@ csrw satp, x0
 //   - Optionally (if defined) also performs in S-mode and U-mode
 // ---------------------------------------------------------------------------
 .macro RWX_VERIF ADDRESS
+ 
+ RVTEST_GOTO_LOWER_MODE	Smode
  RWX_Access \ADDRESS-4
+ RVTEST_GOTO_MMODE
+ 
+
+ #ifdef UMODE 
+ RVTEST_GOTO_LOWER_MODE Umode
+ RWX_Access \ADDRESS-4
+ RVTEST_GOTO_MMODE
+ #endif
 .endm
 
 // ---------------------------------------------------------------------------
@@ -200,9 +216,9 @@ csrw satp, x0
 // ---------------------------------------------------------------------------
 Test_setup:
   .SET pmpcfgi , CSR_PMPCFG0
-  .rept RVMODEL_NUM_PMPS/4
+  .rept RVMODEL_NUM_PMPS/8
      csrw pmpcfgi ,x0
-  .SET pmpcfgi ,pmpcfgi+1
+  .SET pmpcfgi ,pmpcfgi+2
   .endr
   .SET pmpaddri ,CSR_PMPADDR0
   .rept RVMODEL_NUM_PMPS
@@ -225,7 +241,7 @@ csrs mseccfg,a4
 // Define TOR region with initial execute-only permissions
 TOR_PMPADDR pmpaddr4 ,  initial_permission_setup_start
 TOR_PMPADDR pmpaddr5 , initial_permission_setup_end 
-PMPCFG_SET pmpcfg1 ,PMP1_CFG_SHIFT,PMPCFG(TOR,LX),False 
+PMPCFG_SET pmpcfg0 ,PMP5_CFG_SHIFT,PMPCFG(TOR,LX),False 
 
 // Enable MML (restricts M-mode after setup)
 LI( a4,MML_SET)
@@ -239,7 +255,7 @@ PMPCFG_SET pmpcfg0 ,PMP3_CFG_SHIFT,PMPCFG(TOR,LWX) ,False
 // Shared data region = RW for all modes
 TOR_PMPADDR pmpaddr4,end_code_section
 TOR_PMPADDR pmpaddr5 ,rvmodel_data_end
-PMPCFG_SET pmpcfg1 ,PMP1_CFG_SHIFT,   PMPCFG(TOR,WX),False
+PMPCFG_SET pmpcfg0 ,PMP5_CFG_SHIFT,   PMPCFG(TOR,WX),False
 
 // Test region (RWX verification target)
 TOR_PMPADDR pmpaddr0 , region_under_test_start
@@ -346,9 +362,16 @@ nop
 // Region Under 
 
 region_under_test_start:
+#ifdef RVMODEL_PMP_GRAIN ==0
+.rept 2
+addi a6,a6,1
+.endr
+#endif
+#ifdef RVMODEL_PMP_GRAIN >0
 .rept (1 << RVMODEL_PMP_GRAIN )
 addi a6,a6,1
 .endr
+#endif
 region_under_test_end:
 
 // Get back to where Jal instructino is used in verif code

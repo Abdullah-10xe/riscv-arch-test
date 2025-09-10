@@ -71,6 +71,17 @@ RVTEST_SIGBASE(x13, begin_signature1)
    csrw \PMPCFGI ,a5
  .endif
 .endm
+// ---------------------------------------------------------------------------
+// Macro: TOR_PMPADDR
+// Description : Writes a physical address into PMPADDRi for TOR matching.
+// Notes       : Address is shifted right by 2 (word aligned).
+// ---------------------------------------------------------------------------
+
+.macro TOR_PMPADDR  pmpaddri ADDRESS  
+ LA( a4,  \ADDRESS )           
+ srli a4,a4,PMP_ADDR_SHIFT    
+ csrw \pmpaddri,a4            
+.endm
 
 
 /* --------------------------------------------------------------------------
@@ -111,7 +122,25 @@ test_code:
  csrr a4,pmpcfg0
  RVTEST_SIGUPD(x13,a4)
  /// Set code section as Machine Execute and read and data section/tohost section as read write for both Modes
+  TOR_PMPADDR pmpaddr8 , rvtest_entry_point
+ TOR_PMPADDR pmpaddr9 , end_code_section
+ PMPCFG_SET pmpcfg2 ,PMP1_CFG_SHIFT ,PMPCFG(TOR,LRX),False
+ LI(a4,MML_SET)
+ csrw mseccfg,a4
  
+ TOR_PMPADDR pmpaddr10 , end_code_section
+ TOR_PMPADDR pmpaddr11 , rvmodel_data_end
+ PMPCFG_SET pmpcfg2 ,PMP3_CFG_SHIFT ,PMPCFG(TOR,WX),False
+ 
+ PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,LW),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
+ PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,LWX),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
+ PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,LX),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
  
  
  

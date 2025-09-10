@@ -1,35 +1,25 @@
 // ---------------------------------------------------------------------------
 // Copyright (c) 2025. RISC-V International. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause
-// Title       	 : ACTS for SMEPMP MMWP Functionality 
+// Title       	 : ACTS for SMEPMP MML non Matching Fetch Access  
 // Authors     	 : Abdullah Jhatial
 // Contact	  	 : https://github.com/Abdullah-10xe
 // Test Plan     : https://docs.google.com/spreadsheets/d/10nzG7CR1VP7XvQDaEkK3NrWb0W8dXFUt0H6VPZ99yVY/edit?gid=0#gid=0
 //-----------------------------------------------------------------------------------------------------------------------------------------------
-// Description   : This test verifies the functionality of SMEPMP when the
-//                 MMWP (Machine Mode Whitelist Policy) bit is set. 
-//                 It also validates PMP region enforcement for execution, 
-//                 read, and write accesses across different privilege levels.
+// Description   : This test verifies inst-fetch-access should occur , When MML is set and inst access has not any pmp matching entry
 //
 // Note          : The region permissions are configured at the start of the test
 //
 // Methodology  
 // Step 1        : Clear all PMP configuration and address registers.
-// Step 2        : Configure initial permissions for code, data, and region under test.
-// Step 3        : Set MMWP bit in mseccfg and verify its stickiness.
-// Step 4        : Reconfigure PMP regions dynamically and test RWX accesses.
-// Step 5        : Verify access permissions in M-mode and in S/U-modes  if respective macro defined .
+// Step 2        : Configure initial permissions for code, data
+// Step 3       : Verify access the test under region with fetch access.
 //
 //------------------------------------------------------------------------------------------------------------------------------------------------
-//
-// Test Cases
 //------------------------------------------------------------------------------------------------------------------------------------------------
-// Expected Behavior   :
-//   - Case 1: MMWP bit remains sticky once set, even after subsequent writes.
-//   - Case 2:  Execute ,Store , Laod ,in region under test raises the appropriate Faults
+// Expected Behavior   : Instruction Access Fault on region under test
 // Dependencies        : model_test.h, arch_test.h
 // ------------------------------------------------------------------------------------------------------------------------------------------------
-.option norelax
 
 #include "model_test.h"
 #include "arch_test.h"
@@ -42,7 +32,7 @@ RVTEST_ISA("RV32I_Zicsr")
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True;", MMWP )
+RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True;", MML_NO_Matching )
 
 #ifndef RVMODEL_PMP_GRAIN
   #define RVMODEL_PMP_GRAIN 0
@@ -53,12 +43,6 @@ RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_rou
 #endif
 
 #ifdef TEST
-
-																	
-
-#define UMODE  True
-#define SMODE  True
-
 #define INSTRUCTION            0x00150513
 #define ADDRESS_SPACE          -1
 #define pmpcfg_bits            8
@@ -68,14 +52,24 @@ RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_rou
                     (PMP1CFG_PR << (PMP1_CFG_SHIFT)) |           \
                     (PMP0CFG_PR))
 
-
-
+// ---------------------------------------------------------------------------
+// Signature Space for Recording Signatures 
+// ---------------------------------------------------------------------------
 RVTEST_SIGBASE(x13, begin_signature1)
 .attribute unaligned_access,0
 .attribute stack_align ,16
 .option  norvc
 .align	4
 csrw satp, x0	
+/* --------------------------------------------------------------------------
+   Macro: PMPCFG_SET
+   Description: Configure PMP entries with desired permissions.
+   Arguments:
+     PMPCFGI      - PMP configuration CSR (e.g., pmpcfg0)
+     PMPICFG      - PMP config index
+     LAXWR        - Access permissions (Load/Access/Write/Read)
+     PMPCFGI_SET  - Flag (True/False) to either overwrite or update
+   -------------------------------------------------------------------------- */
 .macro pmpcfg_SET pmpcfgi   pmpicfg LAXWR pmpcfgSETi
  .if \pmpcfgSETi !=1
  li a5, CLEAR(\pmpicfg)
@@ -88,13 +82,25 @@ csrw satp, x0
    csrw \pmpcfgi ,a5
  .endif
 .endm
-
+// ---------------------------------------------------------------------------
+// Macro: TOR_PMPADDR
+// Description : Writes a physical address into PMPADDRi for TOR matching.
+// Notes       : Address is shifted right by 2 (word aligned).
+// ---------------------------------------------------------------------------
 .macro TOR_PMPADDR  ADDRESS  pmpaddri
  la a4,  \ADDRESS 
  srli a4,a4,PMP_ADDR_SHIFT
  csrw \pmpaddri,a4
 .endm
-
+// ---------------------------------------------------------------------------
+// Macro: RWX_Access
+// Description : Attempts Read/Write/Execute operations on a test region.
+// Behavior    :
+//   1. Executes a jump to the test region (verifies Execute permission).
+//   2. Attempts store operations (sb/sh/sw).
+//   3. Attempts load operations (lb/lh/lw).
+//   4. Updates the test signature with the results.
+// ---------------------------------------------------------------------------
 .macro RWX_Access  REGION_UNDER_TEST
  nop
  nop
@@ -131,16 +137,15 @@ csrw satp, x0
 
 // ---------------------------------------------------------------------------
 // Macro: RWX_VERIF
-// Description : Repeats RWX_Access for different privilege levels.
-// Behavior    :
-//   - Always performs access in M-mode
-//   - Optionally (if defined) also performs in S-mode and U-mode
+// Description :  RWX_Access for different privilege levels.
 // ---------------------------------------------------------------------------
 .macro RWX_VERIF ADDRESS
  RWX_Access \ADDRESS-4
 .endm
 
-// Set all pmpaddr and pmpcfg set to zero
+// ---------------------------------------------------------------------------
+// Test_setup : CLEAR all PMP entries before beginning
+// ---------------------------------------------------------------------------
 
 Test_SETup:
   .SET pmpcfgi , CSR_PMPCFG0
@@ -158,7 +163,7 @@ Test_SETup:
 
 initial_permission_setup_start:
 
-/* Seeting teo regions with RWX permissions , but region under test  is not included */
+/* Set up  regions with  permissions , but region under test  is not included */
 
 TOR_PMPADDR rvtest_entry_point,pmpaddr0
 TOR_PMPADDR region_under_test_start ,pmpaddr1

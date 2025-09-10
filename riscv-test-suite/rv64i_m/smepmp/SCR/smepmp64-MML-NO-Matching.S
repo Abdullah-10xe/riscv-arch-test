@@ -1,22 +1,24 @@
+//----------------------------------------------------------------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Copyright (c) 2025. RISC-V International. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause
-// Title       	 : ACTS for SMEPMP MMWP Functionality 
+// Title       	 : ACTS for SMEPMP MML non Matching Fetch Access  
 // Authors     	 : Abdullah Jhatial
 // Contact	  	 : https://github.com/Abdullah-10xe
 // Test Plan     : https://docs.google.com/spreadsheets/d/10nzG7CR1VP7XvQDaEkK3NrWb0W8dXFUt0H6VPZ99yVY/edit?gid=0#gid=0
 //-----------------------------------------------------------------------------------------------------------------------------------------------
-// Description   : This test verifies non matching access when MML is set 
+// Description   : This test verifies inst-fetch-access should occur , When MML is set and inst access has not any pmp match entry
 //
 // Note          : The region permissions are configured at the start of the test
 //
 // Methodology  
 // Step 1        : Clear all PMP configuration and address registers.
-// Step 2        : Configure initial permissions for code, data, and region under test.
-// Step 3        : Set MML bit in mseccfg 
-// Step 4       : Read Write and Execute from non matching .
+// Step 2        : Configure initial permissions for code, data and set MML bit
+// Step 3       : Verify  with Read Write and Execute on non matching region (region under test)
+//
 //------------------------------------------------------------------------------------------------------------------------------------------------
-// Expected Behavior   :  Execute ,Store , Laod ,in region under test raises the appropriate Faults 
+//------------------------------------------------------------------------------------------------------------------------------------------------
+// Expected Behavior   : Instruction Access Fault on region under test
 // Dependencies        : model_test.h, arch_test.h
 // ------------------------------------------------------------------------------------------------------------------------------------------------
 
