@@ -78,9 +78,9 @@ RVTEST_SIGBASE(x13, begin_signature1)
    -------------------------------------------------------------------------- */
 Test_setup:
   .SET pmpcfgi , CSR_PMPCFG0
-  .rept RVMODEL_NUM_PMPS/4
+  .rept RVMODEL_NUM_PMPS/8
      csrw pmpcfgi ,x0        // CLEAR PMP configuration register
-  .SET pmpcfgi ,pmpcfgi+1
+  .SET pmpcfgi ,pmpcfgi+2
   .endr
   .SET pmpaddri ,CSR_PMPADDR0
   .rept RVMODEL_NUM_PMPS

@@ -172,9 +172,9 @@ RVTEST_SIGBASE(x13, begin_signature1)
 // ---------------------------------------------------------------------------
 Test_setup:
   .set pmpcfgi , CSR_PMPCFG0
-  .rept RVMODEL_NUM_PMPS/4
+  .rept RVMODEL_NUM_PMPS/8
     csrw pmpcfgi ,x0
-    .set pmpcfgi ,pmpcfgi+1
+    .set pmpcfgi ,pmpcfgi+2
   .endr
 
   .set pmpaddri ,CSR_PMPADDR0

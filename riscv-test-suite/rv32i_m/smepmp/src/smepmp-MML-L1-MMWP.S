@@ -224,6 +224,7 @@ initial_permission_setup_start:
 
 LI( a4,RLB_SET)
 csrs mseccfg,a4
+LI(a4,MMWP_SET)
 
 // Define TOR region with initial execute-only permissions
 TOR_PMPADDR pmpaddr4 ,  initial_permission_setup_start

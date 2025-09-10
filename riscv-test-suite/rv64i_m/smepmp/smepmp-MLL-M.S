@@ -31,7 +31,18 @@
 //                 - Permissions will be applied dynamically during test case .
 //
 //---------------------------------------------------------------------------------------------------------------------------------------------------
-//
+//   Casess With L bit unset
+// Case 0       : MML bit is set in initial permission Setup code  now Unset the MML bit and update the signature  
+// Case 1       : Set Permission   For Region Under Test As LRWX = 0000 (Inaccessible region)
+// Case 2       : Set Permission   For Region Under Test As LRWX = 0001 (Execute-only region)
+// Case 3       : Set Permission   For Region Under Test As LRWX = 0010 (Shared data region: Read/write on M mode, read-only on S/U mode)
+// Case 4       : Set Permission   For Region Under Test As LRWX = 0011 (Shared data region: Read/write for both M and S/U mode  )
+// Case 5       : Set Permission   For Region Under Test As LRWX = 0100 (Read-only region)
+// Case 6       : Set Permission   For Region Under Test As LRWX = 0101 (Read/Execute region)
+// Case 7       : Set Permission   For Region Under Test As LRWX = 0110 (Read/Write region)
+// Case 8       : Set Permission   For Region Under Test As LRWX = 0111 (Read/Write/Execute region only in SU)
+//--------------------------------------------------------------------------------------------------------
+//  Casess With Lock bit set
 // case1        : Set Permission   For Region Under Test As LRWX = 1000
 // case2        : Set Permission   For Region Under Test As LRWX = 1001 
 // case3        : Set Permission   For Region Under Test As LRWX = 1010
@@ -80,8 +91,6 @@ RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_rou
 #endif
 
 #ifdef TEST
-#define SMODE    True
-#define UMODE    True																
 
 // ---------------------------------------------------------------------------
 // INSTRUCTION ENCODDINGS
@@ -184,18 +193,6 @@ csrw satp, x0
 // ---------------------------------------------------------------------------
 .macro RWX_VERIF ADDRESS
  RWX_Access \ADDRESS-4
-
- #ifdef SMODE 
- RVTEST_GOTO_LOWER_MODE	Smode
- RWX_Access \ADDRESS
- RVTEST_GOTO_MMODE
- #endif
-
- #ifdef UMODE 
- RVTEST_GOTO_LOWER_MODE Umode
- RWX_Access \ADDRESS
- RVTEST_GOTO_MMODE
- #endif
 .endm
 
 // ---------------------------------------------------------------------------
@@ -251,13 +248,54 @@ TOR_PMPADDR pmpaddr1 , region_under_test_end
 initial_permission_setup_end:
 
 test_code:
-
-// case 0  SET permission for region under test 
+//CASE zero stickness of MML
 LI( a4,0x1 )
 csrc mseccfg,a4
 RVTEST_SIGUPD(x13,a4)
 
-// case 1 Inaccessible region s
+// CASE 1 Inaccessible region SET the permsission
+
+
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,NONE),False
+RWX_VERIF region_under_test_end
+
+//CASE 2    Execute-only region
+ 
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,X) ,False
+RWX_VERIF region_under_test_end
+
+// Case3  Shared data region: Read/write on M mode, read-only on S/U mode
+
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,W)  ,False
+RWX_VERIF region_under_test_end
+
+
+// CASE 4 Shared data region: Read/write for both M and S/U mode 
+
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,WX) ,False
+RWX_VERIF region_under_test_end
+
+// CASE 5  Read-only region in S/U mode only
+
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT, PMPCFG(TOR,R)  ,False
+RWX_VERIF region_under_test_end
+
+//CASE 6  Read/Execute region in S/U mode only
+
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,RX) ,False
+RWX_VERIF region_under_test_end
+
+//CASE 7   Read/Write region in S/U mode only
+
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,RW) ,False
+RWX_VERIF region_under_test_end
+
+ //  Read Write Execute in S/U mode only
+
+PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,RWX)  ,False
+RWX_VERIF region_under_test_end
+/// MML now with Lock bit
+// case 1 Inaccessible region 
 
 PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT,PMPCFG(TOR,L),False
 RWX_VERIF region_under_test_end
