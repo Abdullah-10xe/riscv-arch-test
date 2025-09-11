@@ -14,7 +14,7 @@
 // Dependencies :   model_test.h, arch_test.h
 // Fault        : No fault expected from test code 
 // ---------------------------------------------------------------------------
-
+.option norelax
 #include "model_test.h"
 #include "arch_test.h"
 
@@ -72,6 +72,18 @@ RVTEST_SIGBASE(x13, begin_signature1)
  .endif
 .endm
 
+// ---------------------------------------------------------------------------
+// Macro: TOR_PMPADDR
+// Description : Writes a physical address into PMPADDRi for TOR matching.
+// Notes       : Address is shifted right by 2 (word aligned).
+// ---------------------------------------------------------------------------
+
+.macro TOR_PMPADDR  pmpaddri ADDRESS  
+ LA( a4,  \ADDRESS )           
+ srli a4,a4,PMP_ADDR_SHIFT    
+ csrw \pmpaddri,a4            
+.endm
+
 
 /* --------------------------------------------------------------------------
    Test Setup: CLEAR all PMP configuration and address registers.
@@ -110,8 +122,26 @@ test_code:
  PMPCFG_SET pmpcfg0 ,PMP1_CFG_SHIFT ,PMPCFG(TOR,LWX),False
  csrr a4,pmpcfg0
  RVTEST_SIGUPD(x13,a4)
+ /// Set code section as Machine Execute and read and data section/tohost section as read write for both Modes
+ TOR_PMPADDR pmpaddr8 , rvtest_entry_point
+ TOR_PMPADDR pmpaddr9 , end_code_section
+ PMPCFG_SET pmpcfg2 ,PMP1_CFG_SHIFT ,PMPCFG(TOR,LRX),False
+ LI(a4,MML_SET)
+ csrw mseccfg,a4
  
-
+ TOR_PMPADDR pmpaddr10 , end_code_section
+ TOR_PMPADDR pmpaddr11 , rvmodel_data_end
+ PMPCFG_SET pmpcfg2 ,PMP3_CFG_SHIFT ,PMPCFG(TOR,WX),False
+ 
+ PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,LW),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
+ PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,LWX),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
+ PMPCFG_SET pmpcfg0 ,PMP0_CFG_SHIFT ,PMPCFG(TOR,LX),False
+ csrr a4,pmpcfg0
+ RVTEST_SIGUPD(x13,a4)
 nop
 nop 
 j exit
@@ -133,28 +163,29 @@ exit:
 RVTEST_CODE_END
 RVMODEL_HALT
 end_code_section:
-
-RVTEST_DATA_BEGIN
 .align 4
+RVTEST_DATA_BEGIN
 rvtest_data:
+.word 0xbabecafe// test data (if any) goes here
 RVTEST_DATA_END
+.align 4
 RVMODEL_DATA_BEGIN
   rvtest_sig_begin:
-  sig_begin_canary:
-  CANARY;
-    .globl begin_signature
+    .globl begin_signature1
+    .align 4
 begin_signature1:
-   // .fill 528*(XLEN/32),(XLEN/4),0xdeadbeef
-   .rept 254
-    .word 0xdeadbeef
-   .endr
+    .rept  256
+      .word 0xdeadbeef
+    .endr
     .globl end_signature
 end_signature1:
 #ifdef rvtest_mtrap_routine
 tsig_begin_canary:
 CANARY;
 mtrap_sigptr:
-    .fill 448*(XLEN/32),4,0xdeadbeef
+  .rept  256
+      .word 0xdeadbeef
+    .endr
 tsig_end_canary:
 CANARY;
 #endif

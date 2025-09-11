@@ -1,45 +1,24 @@
+//----------------------------------------------------------------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Copyright (c) 2025. RISC-V International. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause
-// Title       	 : ACTS for SMEPMP MMWP Functionality 
+// Title       	 : ACTS for SMEPMP MML non Matching Fetch Access  
 // Authors     	 : Abdullah Jhatial
 // Contact	  	 : https://github.com/Abdullah-10xe
 // Test Plan     : https://docs.google.com/spreadsheets/d/10nzG7CR1VP7XvQDaEkK3NrWb0W8dXFUt0H6VPZ99yVY/edit?gid=0#gid=0
 //-----------------------------------------------------------------------------------------------------------------------------------------------
-// Description   : This test verifies the functionality of SMEPMP when the
-//                 MMWP (Machine Mode Whitelist Policy) bit is set. 
-//                 It also validates PMP region enforcement for execution, 
-//                 read, and write accesses across different privilege levels.
+// Description   : This test verifies inst-fetch-access should occur , When MML is set and inst access has not any pmp match entry
 //
 // Note          : The region permissions are configured at the start of the test
 //
 // Methodology  
 // Step 1        : Clear all PMP configuration and address registers.
-// Step 2        : Configure initial permissions for code, data, and region under test.
-// Step 3        : Set MMWP bit in mseccfg and verify its stickiness.
-// Step 4        : Reconfigure PMP regions dynamically and test RWX accesses.
-// Step 5        : Verify access permissions in M-mode and in S/U-modes  if respective macro defined .
+// Step 2        : Configure initial permissions for code, data and set MML bit
+// Step 3       : Verify  with Read Write and Execute on non matching region (region under test)
 //
 //------------------------------------------------------------------------------------------------------------------------------------------------
-//
-// Test Cases   : 
-// Case 1       : Verify stickiness of the MMWP bit by setting/unsetting and
-//                checking updated signature values.
-// Case 2       : Regions are configured at the start of the test, Region under region is not in config range
-//                in the Region Under Test.
-//                - Attempt instruction fetch 
-//                - Attempt store (byte, halfword, word)
-//                - Attempt load (byte, halfword, word)
-//                - Update signature after each attempt
-//
 //------------------------------------------------------------------------------------------------------------------------------------------------
-// Verification : For each test case, execute, load, and store instructions 
-//                from the Region Under Test at byte, halfword, and word granularity.
-//                Verification in S-mode and U-mode can be enabled using SMODE/UMODE macros.
-//------------------------------------------------------------------------------------------------------------------------------------------------
-// Expected Behavior   :
-//   - Case 1: MMWP bit remains sticky once set, even after subsequent writes.
-//   - Case 2:  Execute ,Store , Laod ,in region under test raises the appropriate Faults
+// Expected Behavior   : Instruction Access Fault on region under test
 // Dependencies        : model_test.h, arch_test.h
 // ------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -47,7 +26,7 @@
 #include "model_test.h"
 #include "arch_test.h"
 
-RVTEST_ISA("RV32I_Zicsr")
+RVTEST_ISA("RV64I_Zicsr")
 
 .section .text.init
 .globl rvtest_entry_point
@@ -55,7 +34,7 @@ RVTEST_ISA("RV32I_Zicsr")
 rvtest_entry_point:
 RVMODEL_BOOT
 RVTEST_CODE_BEGIN
-RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True;", MMWP )
+RVTEST_CASE(1,"def TEST=True;def rvtest_mtrap_routine=True; def rvtest_strap_routine = True;", MML_NO_Matching )
 
 #ifndef RVMODEL_PMP_GRAIN
   #define RVMODEL_PMP_GRAIN 0
@@ -147,39 +126,18 @@ RVTEST_SIGBASE(x13, begin_signature1)
 // Description : Repeats RWX_Access for different privilege levels.
 // Behavior    :
 //   - Always performs access in M-mode
-//   - Optionally (if defined) also performs in S-mode and U-mode
 // ---------------------------------------------------------------------------
 .macro RWX_VERIF ADDRESS
  RWX_Access \ADDRESS-4
-
- #ifdef SMODE 
- nop
- nop
- RVTEST_GOTO_LOWER_MODE   Smode
- RWX_Access \ADDRESS-4
- RVTEST_GOTO_MMODE
- nop
- nop
- #endif
-
- #ifdef UMODE 
- nop
- nop
- RVTEST_GOTO_LOWER_MODE Umode
- RWX_Access \ADDRESS-4
- RVTEST_GOTO_MMODE
- nop
- nop
- #endif
 .endm
 
 // Set all pmpaddr and pmpcfg set to zero
 
 Test_SETup:
   .SET pmpcfgi , CSR_PMPCFG0
-  .rept RVMODEL_NUM_PMPS/4
+  .rept RVMODEL_NUM_PMPS/8
      csrw pmpcfgi ,x0
-  .SET pmpcfgi ,pmpcfgi+1
+  .SET pmpcfgi ,pmpcfgi+2
   .endr
   .SET pmpaddri ,CSR_PMPADDR0
   .rept RVMODEL_NUM_PMPS
@@ -191,7 +149,7 @@ Test_SETup:
 
 initial_permission_setup_start:
 
-/* Seeting teo regions with RWX permissions , but region under test  is not included */
+/* Set up  regions with  permissions , but region under test  is not included */
 
 TOR_PMPADDR rvtest_entry_point,pmpaddr0
 TOR_PMPADDR region_under_test_start ,pmpaddr1
@@ -202,6 +160,8 @@ PMPCFG_SET pmpcfg0 ,0,SET_PMPCFGi( PMPCFG(TOR,LRX) ,PMPCFG(OFF,NONE) ,PMPCFG(TOR
 
 TOR_PMPADDR end_code_section,pmpaddr4
 TOR_PMPADDR   data_end_section,pmpaddr5
+LI(a4,MML_SET)
+csrw mseccfg,a4
 PMPCFG_SET pmpcfg1 ,0,SET_PMPCFGi( PMPCFG(OFF,NONE) ,PMPCFG(OFF,NONE) ,PMPCFG(TOR,WX),PMPCFG(OFF,NONE)) ,True
 
 nop
@@ -209,21 +169,30 @@ nop
 initial_permission_setup_end:
 
 TEST_CODE:
-
+nop
+nop
+RWX_VERIF region_under_test_end
 //  Exit the Test code 
-
+nop
+nop
 j exit
 nop
 nop
-
 test_code_end_start:
 
 // Region under test region
 .align 4
 region_under_test_start:
+#ifdef RVMODEL_PMP_GRAIN ==0
+.rept 2
+addi a6,a6,1
+.endr
+#endif
+#ifdef RVMODEL_PMP_GRAIN >0
 .rept (1 << RVMODEL_PMP_GRAIN )
 addi a6,a6,1
 .endr
+#endif
 region_under_test_end:
 
 // Return to Verif code as it is raises instruction access fault or succcessful execution 
